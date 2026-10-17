@@ -1,5 +1,7 @@
 import os
+import re
 import json
+import unicodedata
 import pandas as pd
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,7 +30,6 @@ print("\n^ Check this list. If 'wait_time' isn't in it, Google isn't giving "
 # --- Step 2: build the DataFrame with your requested fields ---
 rows = []
 for i, review in enumerate(raw_reviews, start=1):
-    user = review.get("user", {})
     extracted = review.get("extracted_snippet", {})
     details = review.get("details", {}) or {}
     response = review.get("response", {}) or {}
@@ -43,7 +44,8 @@ for i, review in enumerate(raw_reviews, start=1):
         # Per-aspect details - will be None if this specific review
         # didn't include that field, or if Google doesn't track it
         # for this business at all
-        "order_type": details.get("meal_type"),
+        "order_type": details.get("order_type"),
+        "meal_type": details.get("meal_type"),
         "price_per_person": details.get("price_per_person"),
         "food": details.get("food"),
         "service": details.get("service"),
@@ -57,6 +59,25 @@ for i, review in enumerate(raw_reviews, start=1):
     })
 
 df = pd.DataFrame(rows)
+
+# --- Step 3: normalize review text ---
+# Keeps the original "text" untouched and adds "clean_text" next to it.
+# Case is kept on purpose (CAPS carry sentiment) and nothing is deleted.
+QUOTES = {"‘": "'", "’": "'", "“": '"', "”": '"'}
+INVISIBLE = re.compile(r"[​‌‍⁠﻿]")
+
+
+def normalize_text(text):
+    if not isinstance(text, str):
+        return text
+    text = unicodedata.normalize("NFC", text)
+    text = INVISIBLE.sub("", text)
+    for fancy, plain in QUOTES.items():
+        text = text.replace(fancy, plain)
+    return re.sub(r"\s+", " ", text).strip()  # newlines/tabs/runs of spaces -> one space
+
+
+df.insert(df.columns.get_loc("text") + 1, "clean_text", df["text"].map(normalize_text))
 
 print(f"\nDataFrame shape: {df.shape}")
 print(df.head())
