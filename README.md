@@ -46,8 +46,13 @@ To rebuild the CSV from the raw file:
 python scripts/run_clean.py
 ```
 
+## Tests
+```
+pytest
+```
+
 ## Roadmap
-- [ ] Keep emoji intact in `normalize_text` (a zero-width joiner is currently removed)
+- [x] Keep emoji intact in `normalize_text`
 - [ ] Language detection
-- [ ] Tests for the cleaning functions
+- [x] Tests for the cleaning functions
 - [ ] Aspect-based sentiment analysis, compared against the star ratings
