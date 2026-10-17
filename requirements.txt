@@ -3,3 +3,4 @@ python-dotenv
 serpapi
 jupyterlab
 -e .
+pytest

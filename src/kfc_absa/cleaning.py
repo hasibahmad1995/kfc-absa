@@ -4,10 +4,11 @@ import unicodedata
 
 import pandas as pd
 
-# Curly quotes -> straight quotes.
-QUOTES = {"‘": "'", "’": "'", "“": '"', "”": '"'}
-# Zero-width characters that carry no visible text.
-INVISIBLE = re.compile(r"[​‌‍⁠﻿]")
+# Curly quotes -> straight quotes (U+2018/2019 single, U+201C/201D double).
+QUOTES = {"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'}
+# Zero-width characters that carry no text. U+200D (zero-width joiner) is NOT
+# listed on purpose: emoji such as the woman facepalming use it to glue pieces together.
+INVISIBLE = re.compile(r"[\u200b\u200c\u2060\ufeff]")
 
 
 def normalize_text(text):
