@@ -1,9 +1,14 @@
 """Tests for the cleaning functions. Reviews here are made up."""
+import unicodedata
+
 import pandas as pd
 
 from kfc_absa.cleaning import detail_keys, flatten_reviews, normalize_text
 
-FACEPALM = "\U0001F926\u200d\u2640\ufe0f"  # face palm + zero-width joiner + female sign
+ZWJ = "\N{ZERO WIDTH JOINER}"
+FACEPALM = "\N{FACE PALM}" + ZWJ + "\N{FEMALE SIGN}\N{VARIATION SELECTOR-16}"
+FAMILY = "\N{MAN}" + ZWJ + "\N{WOMAN}" + ZWJ + "\N{GIRL}"
+ENGLAND_FLAG = "\N{WAVING BLACK FLAG}" + "".join(chr(c) for c in (0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067, 0xE007F))
 
 
 # --- normalize_text -------------------------------------------------------
@@ -12,20 +17,37 @@ def test_whitespace_runs_become_one_space_and_ends_are_trimmed():
     assert normalize_text("  great\n\nfood \t here \n") == "great food here"
 
 
-def test_curly_quotes_become_straight():
-    assert normalize_text("it\u2019s \u201cfine\u201d") == "it's \"fine\""
+def test_typographic_quotes_become_straight():
+    text = "it\N{RIGHT SINGLE QUOTATION MARK}s \N{LEFT DOUBLE QUOTATION MARK}fine\N{RIGHT DOUBLE QUOTATION MARK}"
+    assert normalize_text(text) == "it's \"fine\""
 
 
-def test_zero_width_space_is_removed():
-    assert normalize_text("cold\u200b fries") == "cold fries"
+def test_invisible_format_characters_are_removed_by_category():
+    # None of these are named in the code; they are all category Cf.
+    for name in ("ZERO WIDTH SPACE", "WORD JOINER", "ZERO WIDTH NO-BREAK SPACE",
+                 "SOFT HYPHEN", "LEFT-TO-RIGHT MARK", "RIGHT-TO-LEFT MARK"):
+        assert normalize_text("cold" + unicodedata.lookup(name) + " fries") == "cold fries", name
 
 
-def test_emoji_joiner_is_kept_so_the_emoji_stays_whole():
-    assert normalize_text(f"so bad {FACEPALM}") == f"so bad {FACEPALM}"
+def test_control_characters_are_removed():
+    assert normalize_text("a\x00b\x07c") == "abc"
+
+
+def test_no_break_space_becomes_a_normal_space():
+    assert normalize_text("a\N{NO-BREAK SPACE}b") == "a b"
+
+
+def test_emoji_sequences_stay_whole():
+    for emoji in (FACEPALM, FAMILY, ENGLAND_FLAG):
+        assert normalize_text(f"so bad {emoji}") == f"so bad {emoji}"
+
+
+def test_what_to_keep_can_be_changed():
+    assert normalize_text(f"a{ZWJ}b", keep=frozenset()) == "ab"
 
 
 def test_case_and_emoji_are_kept():
-    assert normalize_text("NOT GOOD \U0001F621") == "NOT GOOD \U0001F621"
+    assert normalize_text("NOT GOOD \N{POUTING FACE}") == "NOT GOOD \N{POUTING FACE}"
 
 
 def test_missing_values_pass_through():
@@ -86,6 +108,14 @@ def test_reply_and_its_translation_are_copied():
     df = flatten_reviews([make_review()])
     assert df.loc[0, "response_text_original"] == "Kiitos"
     assert df.loc[0, "response_text_translated"] == "Thanks"
+
+
+def test_detail_fields_are_a_parameter():
+    review = make_review(details={"food": 5, "noise_level": "Quiet"})
+    df = flatten_reviews([review], detail_fields=("noise_level", "food"))
+    assert list(df.columns)[5:7] == ["noise_level", "food"]
+    assert df.loc[0, "noise_level"] == "Quiet"
+    assert "order_type" not in df.columns
 
 
 def test_ids_start_at_one_and_there_is_no_reviewer_identifier():
