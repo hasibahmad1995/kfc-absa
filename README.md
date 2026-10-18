@@ -24,12 +24,16 @@ Decisions and problems found along the way are written up in [`notebooks/01_expl
 src/kfc_absa/
     scraping.py     fetch_reviews(client, data_id)
     cleaning.py     flatten_reviews(raw), normalize_text(text)
+    profile.py      profile_texts(texts): counts only, never shows review text
     data_io.py      load/save the raw JSON and the CSV
     config.py       paths
 scripts/            run_scrape.py, run_clean.py
 notebooks/          01_exploration.ipynb
 data/               raw/ (git-ignored), processed/reviews.csv
 ```
+
+## Design rule
+Cleaning rules come from standards (Unicode categories) and from parameters, never from reading the data. Optional review fields are discovered from the data. `profile_texts` summarises a text column with counts only, so data you may not read can still be checked.
 
 ## Setup
 ```

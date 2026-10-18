@@ -4,7 +4,8 @@ import unicodedata
 
 import pandas as pd
 
-# Typographic quotes -> straight quotes.
+# Typographic quotes -> straight quotes. A fixed fact about Unicode, not taken from
+# any dataset. Guillemets are left alone: they are real quotes in some languages.
 QUOTES = {
     "\N{LEFT SINGLE QUOTATION MARK}": "'",
     "\N{RIGHT SINGLE QUOTATION MARK}": "'",
@@ -39,7 +40,7 @@ def _is_invisible_junk(ch, keep):
     return category == "Cc" and not ch.isspace()  # control characters, but not \n or \t
 
 
-def normalize_text(text, keep=KEEP_FORMAT_CHARS):
+def normalize_text(text, keep=KEEP_FORMAT_CHARS, quote_table=QUOTE_TABLE):
     """Return `text` with consistent quotes, no invisible junk and tidy whitespace.
 
     Case, punctuation and emoji are kept on purpose: they can carry sentiment.
@@ -49,34 +50,28 @@ def normalize_text(text, keep=KEEP_FORMAT_CHARS):
         return text
     text = unicodedata.normalize("NFC", text)
     text = "".join(ch for ch in text if not _is_invisible_junk(ch, keep))
-    text = text.translate(QUOTE_TABLE)
+    text = text.translate(quote_table)
     return re.sub(r"\s+", " ", text).strip()  # newlines/tabs/runs of spaces -> one space
 
 
-# Optional per-review scores and details. Google does not give the same ones
-# for every business, so this is a parameter of flatten_reviews. Use
-# detail_keys(raw) to see which fields a new dataset actually has.
-DETAIL_FIELDS = (
-    "order_type",        # Dine in / Take out / Delivery
-    "meal_type",         # Breakfast / Lunch / Dinner ...
-    "price_per_person",
-    "food",
-    "service",
-    "atmosphere",
-    "wait_time",
-)
-
-
 def detail_keys(raw_reviews):
-    """All field names that appear in the `details` part of any review."""
-    keys = set()
+    """Field names that appear in the `details` part of any review, in the order first seen."""
+    keys = {}
     for review in raw_reviews:
-        keys.update((review.get("details") or {}).keys())
-    return keys
+        for key in (review.get("details") or {}):
+            keys.setdefault(key, None)
+    return list(keys)
 
 
-def flatten_reviews(raw_reviews, detail_fields=DETAIL_FIELDS):
-    """One row per review. `clean_text` sits next to `text`."""
+def flatten_reviews(raw_reviews, detail_fields=None):
+    """One row per review. `clean_text` sits next to `text`.
+
+    Google gives different optional details (food, service, ...) for different
+    businesses. By default every field found in the data becomes a column.
+    Pass `detail_fields` to choose columns yourself.
+    """
+    if detail_fields is None:
+        detail_fields = detail_keys(raw_reviews)
     rows = []
     for i, review in enumerate(raw_reviews, start=1):
         extracted = review.get("extracted_snippet") or {}

@@ -42,6 +42,10 @@ def test_emoji_sequences_stay_whole():
         assert normalize_text(f"so bad {emoji}") == f"so bad {emoji}"
 
 
+def test_quote_mapping_can_be_changed():
+    assert normalize_text("it’s", quote_table={}) == "it’s"
+
+
 def test_what_to_keep_can_be_changed():
     assert normalize_text(f"a{ZWJ}b", keep=frozenset()) == "ab"
 
@@ -100,7 +104,7 @@ def test_review_without_details_or_response_still_works():
     review = {"rating": 1, "iso_date": "2026-01-01T10:00:00Z", "snippet": "meh"}
     df = flatten_reviews([review])
     assert df.loc[0, "text"] == "meh"
-    assert pd.isna(df.loc[0, "order_type"])
+    assert "order_type" not in df.columns  # nothing in the data, so no column
     assert pd.isna(df.loc[0, "response_text_original"])
 
 
@@ -108,6 +112,13 @@ def test_reply_and_its_translation_are_copied():
     df = flatten_reviews([make_review()])
     assert df.loc[0, "response_text_original"] == "Kiitos"
     assert df.loc[0, "response_text_translated"] == "Thanks"
+
+
+def test_detail_fields_are_discovered_from_the_data_by_default():
+    review = make_review(details={"rooms": 4, "cleanliness": 5})
+    df = flatten_reviews([review])
+    assert df.loc[0, "rooms"] == 4 and df.loc[0, "cleanliness"] == 5
+    assert "food" not in df.columns
 
 
 def test_detail_fields_are_a_parameter():
@@ -128,4 +139,4 @@ def test_ids_start_at_one_and_there_is_no_reviewer_identifier():
 
 def test_detail_keys_collects_every_key_seen():
     reviews = [make_review(), {"details": {"wait_time": "5 min"}}, {"details": None}, {}]
-    assert detail_keys(reviews) == {"order_type", "meal_type", "food", "service", "wait_time"}
+    assert detail_keys(reviews) == ["order_type", "meal_type", "food", "service", "wait_time"]
